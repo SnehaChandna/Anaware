@@ -84,10 +84,10 @@ Before running the project, ensure you have the following installed:
    conda activate main
    ```
 
-2. Create and activate the Conda environment for the `malix` server using the `malix.yml` file:
+2. Create and activate the Conda environment for the `malex` server using the `malex.yml` file:
    ```bash
-   conda env create -f malix.yml
-   conda activate malix
+   conda env create -f malex.yml
+   conda activate malex
    ```
 
 #### Running the Flask Servers
@@ -100,8 +100,8 @@ Before running the project, ensure you have the following installed:
      ```
    - Note the port on which this server is running (e.g., `http://localhost:5001`).
 
-2. **Running the `malix` server (`bigram_server.py`)**:
-   - Ensure the `malix` environment is activated.
+2. **Running the `malex` server (`bigram_server.py`)**:
+   - Ensure the `malex` environment is activated.
    - Run the server:
      ```bash
      python bigram_server.py
