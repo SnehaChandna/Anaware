@@ -6,7 +6,7 @@ This project is structured into three main folders: `frontend`, `backend`, and `
 
 - **frontend**: Contains the frontend code for the project.
 - **backend**: Contains the backend code for the project.
-- **server**: Contains the Flask servers (both `bigram_server.py` and `flask_server_chetan.py`).
+- **server**: Contains the Flask servers (both `bigram_server.py` and `flask_server.py`).
 
 ## Prerequisites
 
