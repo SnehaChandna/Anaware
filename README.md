@@ -117,8 +117,9 @@ Before running the project, ensure you have the following installed:
 ### 5. Running the Project
 
 1. Ensure all three servers (frontend, backend, and Flask servers) are running.
-2. Open the frontend URL (usually `http://localhost:3000`) in your browser.
-3. The project should now be fully functional.
+2. The frontend should be running on http://localhost:5173.
+3. The backend should be running on http://localhost:8787.
+4. The project should now be fully functional.
 
 ## Troubleshooting
 
