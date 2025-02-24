@@ -15,6 +15,7 @@ Before running the project, ensure you have the following installed:
 - **Node.js** and **npm** (for frontend and backend)
 - **Python** and **pip** (for Flask servers)
 - **Conda** (for managing Python environments)
+- **Git** (for cloning repositories)
 
 ## Setup Instructions
 
@@ -58,20 +59,32 @@ Before running the project, ensure you have the following installed:
 
 ### 3. Flask Server Setup
 
-#### Environment Setup
+#### Cloning the MaleX Repository
 
 1. Navigate to the `server` folder:
    ```bash
    cd server
    ```
 
-2. Create and activate the Conda environment for the `main` server using the `main.yml` file:
+2. Clone the MaleX repository:
+   ```bash
+   git clone https://github.com/Mayachitra-Inc/MaleX.git
+   ```
+
+3. Navigate into the cloned repository:
+   ```bash
+   cd MaleX
+   ```
+
+#### Environment Setup
+
+1. Create and activate the Conda environment for the `main` server using the `main.yml` file:
    ```bash
    conda env create -f main.yml
    conda activate main
    ```
 
-3. Create and activate the Conda environment for the `malix` server using the `malix.yml` file:
+2. Create and activate the Conda environment for the `malix` server using the `malix.yml` file:
    ```bash
    conda env create -f malix.yml
    conda activate malix
