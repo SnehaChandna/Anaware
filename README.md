@@ -92,11 +92,11 @@ Before running the project, ensure you have the following installed:
 
 #### Running the Flask Servers
 
-1. **Running the `main` server (`flask_server_chetan.py`)**:
+1. **Running the `main` server (`flask_server.py`)**:
    - Ensure the `main` environment is activated.
    - Run the server:
      ```bash
-     python flask_server_chetan.py
+     python flask_server.py
      ```
    - Note the port on which this server is running (e.g., `http://localhost:5001`).
 
