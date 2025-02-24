@@ -1,6 +1,7 @@
 # Project README
 
 ### Demo Video: https://youtu.be/jTz1iEvyECA
+### Presentation: https://drive.google.com/file/d/1g3s1aFOpoNX8NSsI2WZ7Wa56xWgRufpO/view?usp=sharing
 
 This project is structured into three main folders: `frontend`, `backend`, and `server`. Each folder contains a different part of the application, and all three components need to be running simultaneously for the project to function correctly. Below are the instructions to set up and run each part of the project.
 
