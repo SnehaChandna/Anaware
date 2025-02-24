@@ -19,6 +19,10 @@ from ultralytics import YOLO
 import tempfile
 import magic
 from PIL import Image, ImageFile
+import os
+import tempfile
+import subprocess
+from werkzeug.utils import secure_filename
 import hashlib
 
 # Configure PIL to prevent decompression bomb attacks
@@ -436,5 +440,65 @@ def health_check():
         "version": "1.0"
     }), 200
 
+
+@app.route('/pdf_scan', methods=['POST'])
+def pdf_scan():
+        # List of required features
+    REQUIRED_FEATURES = [
+        "file_size", "file_entropy", "hash_value", "pdf_version", "object_stream_mismatches",
+        "incremental_updates", "high_entropy_objects", "js_size", "js_entropy", "js_obfuscation_score",
+        "action_javascript", "action_launch", "action_uri", "action_goto", "action_openaction",
+        "action_aa", "action_js", "action_triggers", "embedded_exe", "embedded_zip", "embedded_jpg",
+        "embedded_executable_files", "total_streams", "high_entropy_streams", "total_urls",
+        "unique_urls", "suspicious_urls"
+    ]
+    if 'file' not in request.files:
+        return jsonify({"error": "No file part"}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "No selected file"}), 400
+    
+    file_name = secure_filename(file.filename)
+
+    # Create a temporary directory to store the uploaded file and output CSV
+    with tempfile.TemporaryDirectory(dir=UPLOAD_FOLDER) as tmp_dir:
+        # Save the uploaded file to the temporary directory
+        file_path = os.path.join(tmp_dir, file_name)
+        file.save(file_path)
+        os.chmod(file_path, 0o400)
+
+        # Define the output CSV path
+        output_csv_path = os.path.join(tmp_dir, "output.csv")
+
+        # Execute the command
+        command = [
+            "python", "pdf.py",
+            "--benign", tmp_dir,  # Use the temporary directory as the input path
+            "--output", tmp_dir  # Use the temporary directory as the output path
+        ]
+        try:
+            subprocess.run(command, check=True)
+        except subprocess.CalledProcessError as e:
+            return jsonify({"error": f"Command execution failed: {str(e)}"}), 500
+
+        # Read the output CSV
+        if not os.path.exists(output_csv_path):
+            return jsonify({"error": "Output CSV not found"}), 500
+
+        print("csv created")
+        df = pd.read_csv(output_csv_path)
+
+        # Check if the CSV contains the required features
+        missing_features = [feature for feature in REQUIRED_FEATURES if feature not in df.columns]
+        if missing_features:
+            return jsonify({"error": f"Missing required features in CSV: {missing_features}"}), 500
+
+        # Extract only the required features
+        features = df[REQUIRED_FEATURES].iloc[0].to_dict()
+
+        # Return the features as JSON
+        return jsonify({"message": "File processed successfully", "features": features})
+    
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)  # Disable debug in production
