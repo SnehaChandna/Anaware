@@ -22,7 +22,7 @@ const app = new Hono<{
     VIRUSTOTAL_API_KEY: string;
   };
 }>();
-const FLASK_ENDPOINT="https://2271-138-246-3-237.ngrok-free.app"
+const FLASK_ENDPOINT="http://127.0.0.1:5000"
 
 
 app.use("/*", cors({
@@ -137,16 +137,13 @@ app.get('/api/search', async (c) => {
 app.post('/api/scan-file', async (c) => {
   const formData = await c.req.formData();
   const file = formData.get('file') as File | null;
-
   if (!file) {
     return c.json({ error: 'No file uploaded' }, 400);
   }
-
   // Determine file type
   const fileExtension = file.name.split('.').pop()?.toLowerCase() || '';
   const ALLOWED_EXTENSIONS_FILES = new Set(['exe', 'dll', 'bin']);
   const ALLOWED_EXTENSIONS_IMAGE = new Set(['png', 'jpg', 'jpeg']);
-
   let flaskEndpoint: string;
   if (ALLOWED_EXTENSIONS_FILES.has(fileExtension)) {
     flaskEndpoint = 'quick_scan';
@@ -155,7 +152,6 @@ app.post('/api/scan-file', async (c) => {
   } else {
     return c.json({ error: 'Unsupported file type' }, 400);
   }
-
   try {
     // Create FormData for Flask
     const flaskFormData = new FormData();
@@ -165,28 +161,24 @@ app.post('/api/scan-file', async (c) => {
 
     // Forward to Flask server
     const flaskResponse = await fetch(
-      `https://2271-138-246-3-237.ngrok-free.app/${flaskEndpoint}`,
+      `${FLASK_ENDPOINT}/${flaskEndpoint}`,
       {
         method: 'POST',
         body: flaskFormData
       }
     );
-
     if (!flaskResponse.ok) {
       const errorText = await flaskResponse.text();
       throw new Error(`Flask server error: ${flaskResponse.status} - ${errorText}`);
     }
-
+    
     // Explicitly type the result
     const result: unknown = await flaskResponse.json();
-    
     // Validate the response structure
     if (typeof result === 'object' && result !== null) {
       return c.json(result as Record<string, unknown>);
     }
 
-    console.log(result)
-    
     return c.json({ data: result });
 
   } catch (error) {

@@ -1,4 +1,4 @@
-name: KrackHackFinal
+name: anaware_bigram_server
 channels:
   - conda-forge
   - defaults

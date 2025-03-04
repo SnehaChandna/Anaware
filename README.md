@@ -74,24 +74,41 @@ Before running the project, ensure you have the following installed:
    git clone https://github.com/Mayachitra-Inc/MaleX.git
    ```
 
-3. Navigate into the cloned repository:
+#### Environment Setup On Linux
+
+1. navigate to the yml directory with the environment config
    ```bash
-   cd MaleX
+   cd yml
+   ```
+2. Create and activate the Conda environment for the `main` server using the `main.yml` file in the root directory:
+   ```bash
+   conda env create -f main_linux.yml
+   conda activate anaware_flask_server
    ```
 
-#### Environment Setup
-
-1. Create and activate the Conda environment for the `main` server using the `main.yml` file:
+3. Create and activate the Conda environment for the `malex` server using the `malex.yml` file in the root directory:
    ```bash
-   conda env create -f main.yml
-   conda activate main
+   conda env create -f malex_linux.yml
+   conda activate anaware_bigram_server
    ```
 
-2. Create and activate the Conda environment for the `malex` server using the `malex.yml` file:
+#### Environment Setup On windows
+1. navigate to the yml directory with the environment config
    ```bash
-   conda env create -f malex.yml
-   conda activate malex
+   cd yml
    ```
+2. Create and activate the Conda environment for the `main` server using the `main.yml` file in the root directory:
+   ```bash
+   conda env create -f main_windows.yml
+   conda activate anaware_flask_server
+   ```
+
+3. Create and activate the Conda environment for the `malex` server using the `malex.yml` file in the root directory:
+   ```bash
+   conda env create -f malex_windows.yml
+   conda activate anaware_bigram_server
+   ```
+
 
 #### Running the Flask Servers
 

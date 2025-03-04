@@ -501,4 +501,4 @@ def pdf_scan():
         return jsonify({"message": "File processed successfully", "features": features})
     
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)  # Disable debug in production
+    app.run(port=5000, debug=True)  # Disable debug in production

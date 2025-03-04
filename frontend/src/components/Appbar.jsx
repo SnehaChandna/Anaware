@@ -122,6 +122,15 @@ export const Appbar = () => {
         </h2>
 
         <div className="flex items-center gap-4">
+          
+        <button
+          onClick={handleHistoryClick}
+          className="p-1 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+        >
+          <History className="text-black dark:text-white" />
+        </button>
+
+
           <div className="h-5 w-[1px] bg-gray-400 dark:bg-gray-600"></div>
 
           <button

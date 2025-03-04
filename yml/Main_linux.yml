@@ -1,4 +1,4 @@
-name: KrackHack
+name: anaware_flask_server
 channels:
   - defaults
   - conda-forge
