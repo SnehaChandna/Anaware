@@ -75,15 +75,27 @@ export const Dashboard = () => {
 
         try {
             let response;
+            // Add headers with authentication token
+            const headers = {};
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+
             if (selected === "FILE") {
                 const formData = new FormData();
                 formData.append("file", file);
+                
                 response = await fetch("http://localhost:8787/api/scan-file", {
                     method: "POST",
+                    headers,
                     body: formData,
                 });
             } else if (selected === "URL" || selected === "SEARCH") {
-                response = await fetch(`http://localhost:8787/api/search?query=${input}`);
+                // Now including the headers with auth token for URL and SEARCH requests
+                response = await fetch(`http://localhost:8787/api/search?query=${input}`, {
+                    method: "GET",
+                    headers
+                });
             }
 
             const data = await response.json();
@@ -91,7 +103,7 @@ export const Dashboard = () => {
             if (!response.ok) {
                 if (data.error === "Unsupported file type") {
                     setErrorMessage(
-                        "Unsupported file type. Please upload exe, dll, bin files for binary scanning or png, jpg, jpeg for image scanning."
+                        "Unsupported file type. Please upload exe, dll, bin files for binary scanning or png, jpg, jpeg for image analysis."
                     );
                 } else {
                     setErrorMessage(data.error || "Analysis failed");
@@ -100,7 +112,17 @@ export const Dashboard = () => {
                 return;
             }
 
+            // Save analysis data to session storage
             sessionStorage.setItem("scanData", JSON.stringify(data));
+            
+            // Also save file name or search/URL query in session storage
+            if (selected === "FILE" && file) {
+                sessionStorage.setItem("scanFileName", file.name);
+            } else if ((selected === "URL" || selected === "SEARCH") && input) {
+                // Store with identifier prefix for better clarity in history view
+                sessionStorage.setItem("scanFileName", `${selected}: ${input}`);
+            }
+    
             navigate("/search");
         } catch (error) {
             console.error("Error:", error);

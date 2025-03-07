@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { PrismaClient } from '@prisma/client/edge';
 import { withAccelerate } from '@prisma/extension-accelerate';
-import { sign } from 'hono/jwt';
+import { sign, verify } from 'hono/jwt';
 import { cors } from 'hono/cors';
 
 interface TokenData {
@@ -22,7 +22,7 @@ const app = new Hono<{
     VIRUSTOTAL_API_KEY: string;
   };
 }>();
-const FLASK_ENDPOINT="http://127.0.0.1:5000"
+const FLASK_ENDPOINT="https://8ff1-2409-40d6-100b-6bca-c0cf-c8e2-d352-8e25.ngrok-free.app"
 
 
 app.use("/*", cors({
@@ -114,6 +114,7 @@ app.get('/auth/google/callback', async (c) => {
 });
 
 
+// Modify the /api/search endpoint in your backend (hono server)
 app.get('/api/search', async (c) => {
   const query = c.req.query('query');
   if (!query) return c.json({ error: 'Query parameter is required' }, 400);
@@ -124,7 +125,60 @@ app.get('/api/search', async (c) => {
       headers: { 'x-apikey': c.env.VIRUSTOTAL_API_KEY },
     });
 
-    const data:any = await response.json();
+    const data = await response.json();
+    
+    // Determine if the URL/search result is malicious based on VirusTotal response
+    let isMalicious = 0; // Default to not malicious
+    
+    // Check if data contains malicious verdict
+    if (data.data && data.data.length > 0) {
+      // For URLs, check the last_analysis_stats
+      if (data.data[0].attributes && data.data[0].attributes.last_analysis_stats) {
+        const stats = data.data[0].attributes.last_analysis_stats;
+        // If any security vendor flagged it as malicious
+        if (stats.malicious > 0 || stats.suspicious > 0) {
+          isMalicious = 1;
+        }
+      }
+    }
+    
+    // Get auth token from request header
+    const authHeader = c.req.header('Authorization');
+    const token = authHeader?.replace('Bearer ', '');
+    
+    // If the user is authenticated, save search to history
+    if (token) {
+      try {
+        const user = await getUserFromToken(token, c.env.JWT_SECRET);
+        if (user && user.id) {
+          const prisma = new PrismaClient({
+            datasourceUrl: c.env.DATABASE_URL,
+          }).$extends(withAccelerate());
+          
+          try {
+            // Determine if the query is a URL or a search
+            const isUrl = query.startsWith('http') || query.startsWith('www.') || /\.[a-z]{2,}$/i.test(query);
+            const queryType = isUrl ? 'URL' : 'SEARCH';
+            
+            // Create a new history record for the search with the malicious flag
+            await prisma.history.create({
+              data: {
+                fileName: `${queryType}: ${query}`,
+                mal: isMalicious, // Use the determined malicious status
+                Date: new Date().toISOString(),
+                userId: user.id
+              }
+            });
+          } finally {
+            await prisma.$disconnect();
+          }
+        }
+      } catch (error) {
+        console.error('Error saving search history:', error);
+        // Continue even if history saving fails
+      }
+    }
+    
     return c.json(data);
   } catch (error) {
     console.error("VirusTotal Search Error:", error);
@@ -132,6 +186,15 @@ app.get('/api/search', async (c) => {
   }
 });
 
+// Helper function to verify JWT token
+async function getUserFromToken(token: string, secret: string) {
+  try {
+    const payload = await verify(token, secret);
+    return payload;
+  } catch (error) {
+    return null;
+  }
+}
 
 // Add to backend (hono server)
 app.post('/api/scan-file', async (c) => {
@@ -172,14 +235,46 @@ app.post('/api/scan-file', async (c) => {
       throw new Error(`Flask server error: ${flaskResponse.status} - ${errorText}`);
     }
     
-    // Explicitly type the result
-    const result: unknown = await flaskResponse.json();
-    // Validate the response structure
-    if (typeof result === 'object' && result !== null) {
-      return c.json(result as Record<string, unknown>);
+    // Get result
+    const result = await flaskResponse.json();
+    
+    // Get auth token from request header
+    const authHeader = c.req.header('Authorization');
+    const token = authHeader?.replace('Bearer ', '');
+    
+    // If the user is authenticated, save scan to history
+    if (token) {
+      try {
+        const user = await getUserFromToken(token, c.env.JWT_SECRET);
+        if (user && user.id) {
+          const prisma = new PrismaClient({
+            datasourceUrl: c.env.DATABASE_URL,
+          }).$extends(withAccelerate());
+          
+          // Determine if file is malicious based on prediction
+          const isMalicious = result.prediction === 'malicious' ? 1 : 0;
+          
+          try {
+            // Create a new history record
+            await prisma.history.create({
+              data: {
+                fileName: `FILE: ${file.name}`, // Add FILE prefix for better identification in history
+                mal: isMalicious,
+                Date: new Date().toISOString(),
+                userId: user.id
+              }
+            });
+          } finally {
+            await prisma.$disconnect();
+          }
+        }
+      } catch (error) {
+        console.error('Error saving history:', error);
+        // Continue even if history saving fails
+      }
     }
 
-    return c.json({ data: result });
+    return c.json(result);
 
   } catch (error) {
     console.error('Error processing file:', error);
@@ -190,6 +285,41 @@ app.post('/api/scan-file', async (c) => {
       }, 
       500
     );
+  }
+});
+
+// New endpoint to get user's history
+app.get('/api/user/history', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) {
+    return c.json({ error: 'Authentication required' }, 401);
+  }
+  
+  const token = authHeader.replace('Bearer ', '');
+  
+  try {
+    const payload = await verify(token, c.env.JWT_SECRET);
+    if (!payload || !payload.id) {
+      return c.json({ error: 'Invalid authentication token' }, 401);
+    }
+    
+    const prisma = new PrismaClient({
+      datasourceUrl: c.env.DATABASE_URL,
+    }).$extends(withAccelerate());
+    
+    try {
+      const history = await prisma.history.findMany({
+        where: { userId: payload.id },
+        orderBy: { Date: 'desc' }
+      });
+      
+      return c.json({ history });
+    } finally {
+      await prisma.$disconnect();
+    }
+  } catch (error) {
+    console.error('Error fetching user history:', error);
+    return c.json({ error: 'Failed to fetch history' }, 500);
   }
 });
 
