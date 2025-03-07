@@ -38,7 +38,7 @@ export const Signup = () => {
 
 
     const handleGoogleSignup = () => {
-        window.location.href = "http://localhost:8787/google/login"; 
+        window.location.href = "https://my-app.b22023.workers.dev/google/login"; 
     };
 
     return (

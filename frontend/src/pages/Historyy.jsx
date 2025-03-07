@@ -20,7 +20,7 @@ export const Historyy = () => {
         }
         
         try {
-            const response = await fetch("https://my-app.fantasy2reality.workers.dev/api/user/history", {
+            const response = await fetch("https://my-app.b22023.workers.dev/api/user/history", {
                 headers: {
                     Authorization: `Bearer ${token}`
                 }

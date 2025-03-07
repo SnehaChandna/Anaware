@@ -26,7 +26,7 @@ const FLASK_ENDPOINT="https://8ff1-2409-40d6-100b-6bca-c0cf-c8e2-d352-8e25.ngrok
 
 
 app.use("/*", cors({
-  origin: ['http://localhost:5173'],
+  origin: ['https://anaware.vercel.app'],
   credentials: true,
 }));
 
@@ -103,7 +103,7 @@ app.get('/auth/google/callback', async (c) => {
     
     console.log("token:",token);
 
-      return c.redirect(`http://localhost:5173/?jwt=${token}`);
+      return c.redirect(`https://anaware.vercel.app/?jwt=${token}`);
     } finally {
       await prisma.$disconnect(); 
     }

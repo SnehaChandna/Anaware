@@ -85,14 +85,14 @@ export const Dashboard = () => {
                 const formData = new FormData();
                 formData.append("file", file);
                 
-                response = await fetch("http://localhost:8787/api/scan-file", {
+                response = await fetch("https://my-app.b22023.workers.dev/api/scan-file", {
                     method: "POST",
                     headers,
                     body: formData,
                 });
             } else if (selected === "URL" || selected === "SEARCH") {
                 // Now including the headers with auth token for URL and SEARCH requests
-                response = await fetch(`http://localhost:8787/api/search?query=${input}`, {
+                response = await fetch(`https://my-app.b22023.workers.dev/api/search?query=${input}`, {
                     method: "GET",
                     headers
                 });
