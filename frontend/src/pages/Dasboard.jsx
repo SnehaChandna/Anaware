@@ -230,8 +230,10 @@ export const Dashboard = () => {
                             <p className="text-gray-600 dark:text-gray-300 mb-4">
                                 {file ? `Selected File: ${file.name}` : "Drag & drop your file here or click to upload"}
                             </p>
+                            // Update the file upload info text to include PDF support
                             <p className="text-gray-500 dark:text-gray-400 text-xs mb-4">
-                                Supported formats: .exe, .dll, .bin (for binary analysis) and .png, .jpg, .jpeg (for image analysis)
+                                Supported formats: .exe, .dll, .bin (for binary analysis), .png, .jpg, .jpeg (for image analysis), 
+                                and .pdf (for PDF analysis)
                             </p>
                             <input
                                 type="file"
