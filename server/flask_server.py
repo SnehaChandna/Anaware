@@ -24,7 +24,7 @@ import tempfile
 import subprocess
 from werkzeug.utils import secure_filename
 import hashlib
-from models import JSONFeatureTokenizer,MalwareDetector, SectionTransformer, ThreeLayerNN
+from models import JSONFeatureTokenizer,MalwareDetector
 import torch
 from PE_extractor import PESectionExtractor
 import json
@@ -124,11 +124,12 @@ def run_deep_scan_on_file(input_file_path: str):
             os.remove(temp_path)
 
 def load_models():
-    global model_YOLO, malwareDetector, json_tokenizer
+    global model_YOLO, malwareDetector, json_tokenizer,section_extractor
     model = joblib.load('xgb_model.pkl')
     model_YOLO = YOLO(YOLO_PATH)
     scaler = joblib.load('scaler.pkl')
     UPLOAD_FOLDER = tempfile.mkdtemp()
+    section_extractor = PESectionExtractor()
     
     input_dim = 8  
     embed_dim = 64 
@@ -541,25 +542,19 @@ def deep_scan():
             print("Error: Invalid DCT image format")
             return
 
-        # Step 2: Process with YOLO model.
-        yolo_result = model_YOLO(img_bigramdct)[0]
-        yolo_probs = yolo_result.probs.data.cpu().numpy().tolist()
-
         # Step 3: Extract PE sections.
-        section_extractor = PESectionExtractor()
         sections = section_extractor.extract_sections(temp_path)
+        print(1)
         # Step 4: Tokenize sections.
         # Assume tokenizer returns a list like: [tokenized_section_list]
         tokenized_sections = json_tokenizer.tokenize_sections(sections)
         # Convert tokenized_sections to tensor without adding an extra batch dimension.
         tokenized_sections_tensor = tokenized_sections[0].unsqueeze(0)
-        print("tokenized_sections_tensor",tokenized_sections_tensor.shape)
         # Step 5: Run the combined model.
         with torch.no_grad():
             # For the image, add a batch dimension (since models typically expect batch)
             img_tensor = torch.tensor(img_bigramdct).unsqueeze(0).to(device)
-            print("img_tensor",img_tensor.shape)
-            combined_pred = malwareDetector(tokenized_sections_tensor, img_tensor)
+            combined_pred = malwareDetector(tokenized_sections_tensor.to(device), img_tensor)
             combined_prob = combined_pred.item()
         
         # Create the response
