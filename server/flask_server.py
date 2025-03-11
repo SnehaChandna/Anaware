@@ -403,20 +403,21 @@ def quick_scan():
         return jsonify({"error": "Invalid file type"}), 400
 
     try:
-        # Use temporary file with auto-cleanup
-        with tempfile.NamedTemporaryFile(dir=UPLOAD_FOLDER, delete=True) as tmp_file:
-            file.save(tmp_file.name)
-            
+        # Create a secure temporary file with restricted permissions
+        fd, temp_path = tempfile.mkstemp(prefix='scan_', suffix='_safe')
+        try:
+            # Close the file descriptor immediately
+            os.close(fd)
+            # Save the uploaded file
+            file.save(temp_path)
             # Get DCT image from Malex service
-            img_bigramdct = request_image("getDCTImage", tmp_file.name)
-            
+            img_bigramdct = request_image("getDCTImage", temp_path)
             if 'error' in img_bigramdct:
                 return jsonify({"error": img_bigramdct['error']}), 502
-            
+        
             # Validate response format
             if not isinstance(img_bigramdct, np.ndarray) or img_bigramdct.shape != (256, 256):
                 return jsonify({"error": "Invalid DCT image format"}), 502
-
             # Process with YOLO model
             result = model_YOLO(img_bigramdct)[0]
             p = result.probs.data.cpu().numpy().tolist()
@@ -427,8 +428,12 @@ def quick_scan():
                 'malicious_probability': float(p[1]),
                 'benign_probability': float(p[0])
             })
-            
+        finally:
+        # Always clean up the temporary file, even if errors occur
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
     except Exception as e:
+        print(e)
         return jsonify({"error": f"Processing error: {str(e)}"}), 500
 
 @app.route('/', methods=['GET'])
