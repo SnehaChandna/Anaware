@@ -24,10 +24,13 @@ import tempfile
 import subprocess
 from werkzeug.utils import secure_filename
 import hashlib
+from models import JSONFeatureTokenizer,MalwareDetector, SectionTransformer, ThreeLayerNN
+import torch
+from PE_extractor import PESectionExtractor
+import json
 
 # Configure PIL to prevent decompression bomb attacks
 ImageFile.LOAD_TRUNCATED_IMAGES = False
-
 warnings.filterwarnings("ignore")
 
 app = Flask(__name__)
@@ -35,16 +38,138 @@ app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024  # Limit uploads to 10MB
 ALLOWED_EXTENSIONS_IMAGE = {'png', 'jpg', 'jpeg'}
 ALLOWED_EXTENSIONS_FILES = {'exe', 'dll', 'bin'}
 
-# Load model and scaler
-model = joblib.load('xgb_model.pkl')
-scaler = joblib.load('scaler.pkl')
-model_YOLO = YOLO("YOLO/mal_detect.pt")  # load the best model
-UPLOAD_FOLDER = tempfile.mkdtemp()
-
 # Configuration
 MALEX_HOST = "127.0.0.1"
 MALEX_PORT = 65432
 SOCKET_TIMEOUT = 30
+YOLO_PATH="YOLO/mal_detect.pt"
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
+# --- The testing function ---
+def run_deep_scan_on_file(input_file_path: str):
+    """
+    Mimics the /deep_scan endpoint logic for a single file:
+      - Validates the file type.
+      - Copies the input file to a secure temporary file.
+      - Processes the file to get a dummy DCT image.
+      - Runs a dummy YOLO model.
+      - Extracts PE sections.
+      - Tokenizes sections (assumed to return a list with one element).
+      - Runs a dummy combined malware detector.
+      - Prints the JSON result.
+    """
+    # Validate file type
+    if not allowed_file_quick_scan(os.path.basename(input_file_path)):
+        print("Error: Invalid file type")
+        return
+
+    # Create a secure temporary file.
+    fd, temp_path = tempfile.mkstemp(prefix='scan_', suffix='_safe')
+    try:
+        os.close(fd)
+        # Copy the contents of the input file to the temporary file.
+        with open(input_file_path, 'rb') as src, open(temp_path, 'wb') as dst:
+            dst.write(src.read())
+
+        # Step 1: Get DCT image from Malex service.
+        img_bigramdct = request_image("getDCTImage", temp_path)
+        if not isinstance(img_bigramdct, np.ndarray) or img_bigramdct.shape != (256, 256):
+            print("Error: Invalid DCT image format")
+            return
+
+        # Step 2: Process with YOLO model.
+        yolo_result = model_YOLO(img_bigramdct)[0]
+        yolo_probs = yolo_result.probs.data.cpu().numpy().tolist()
+
+        # Step 3: Extract PE sections.
+        section_extractor = PESectionExtractor()
+        sections = section_extractor.extract_sections(temp_path)
+        # Step 4: Tokenize sections.
+        # Assume tokenizer returns a list like: [tokenized_section_list]
+        tokenized_sections = json_tokenizer.tokenize_sections(sections)
+        # Convert tokenized_sections to tensor without adding an extra batch dimension.
+        tokenized_sections_tensor = tokenized_sections[0].unsqueeze(0)
+        print("tokenized_sections_tensor",tokenized_sections_tensor.shape)
+        # Step 5: Run the combined model.
+        with torch.no_grad():
+            # For the image, add a batch dimension (since models typically expect batch)
+            img_tensor = torch.tensor(img_bigramdct).unsqueeze(0).to(device)
+            print("img_tensor",img_tensor.shape)
+            combined_pred = malwareDetector(tokenized_sections_tensor, img_tensor)
+            combined_prob = combined_pred.item()
+
+        # Build the response.
+        response = {
+            'yolo_prediction': {
+                'prediction': 'malicious' if float(yolo_probs[1]) >= 0.5 else 'benign',
+                'confidence': float(max(yolo_probs)),
+                'malicious_probability': float(yolo_probs[1]),
+                'benign_probability': float(yolo_probs[0])
+            },
+            'combined_prediction': {
+                'prediction': 'malicious' if combined_prob >= 0.5 else 'benign',
+                'malicious_probability': float(combined_prob)
+            }
+        }
+
+        # Print the JSON response.
+        print(json.dumps(response, indent=4))
+    
+    except Exception as e:
+        print(f"Processing error: {str(e)}")
+    
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+def load_models():
+    global model_YOLO, malwareDetector, json_tokenizer
+    model = joblib.load('xgb_model.pkl')
+    model_YOLO = YOLO(YOLO_PATH)
+    scaler = joblib.load('scaler.pkl')
+    UPLOAD_FOLDER = tempfile.mkdtemp()
+    
+    input_dim = 8  
+    embed_dim = 64 
+    num_heads = 4  
+    num_layers = 2 
+    output_dim = 128  
+    hidden_NN = 256
+    output_NN = 1
+    
+    # Initialize the detector with appropriate parameters
+    malwareDetector = MalwareDetector(
+        input_dim, embed_dim, num_heads, num_layers, 
+        output_dim, YOLO_PATH, hidden_NN, output_NN
+    ).to(device=device)
+    
+    # Load the checkpoint for the model
+    best_model_path = os.path.join("best_malwareDetector.pth")
+    checkpoint = torch.load(best_model_path, map_location=device)
+    
+    # Load state dictionaries for each component
+    feature_transformer_state_dict = {
+        k.replace('featureTransformer.', ''): v
+        for k, v in checkpoint['model_state_dict'].items()
+        if k.startswith('featureTransformer.')
+    }
+    
+    merger_state_dict = {
+        k.replace('merger.', ''): v
+        for k, v in checkpoint['model_state_dict'].items()
+        if k.startswith('merger.')
+    }
+    
+    # Apply state dictionaries to model components
+    malwareDetector.featureTransformer.load_state_dict(feature_transformer_state_dict, strict=True)
+    malwareDetector.merger.load_state_dict(merger_state_dict, strict=True)
+    malwareDetector.eval()
+    
+    # Load the JSON feature tokenizer
+    encoder_path = r"./section_names.p"  # Update with actual path
+    json_tokenizer = JSONFeatureTokenizer(encoder_path)
+
 
 def request_image(command, file_path):
     """Improved socket communication with error handling"""
@@ -388,7 +513,72 @@ def predict():
 
 @app.route('/deep_scan', methods=['POST'])
 def deep_scan():
-    return predict()
+    """
+    Endpoint for advanced malware scanning using both YOLO and transformer models.
+    """
+    if 'file' not in request.files:
+        return jsonify({"error": "No file part"}), 400
+   
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "No selected file"}), 400
+   
+    if not allowed_file_quick_scan(file.filename):
+        return jsonify({"error": "Invalid file type"}), 400
+    
+    # Create a secure temporary file with restricted permissions
+    fd, temp_path = tempfile.mkstemp(prefix='scan_', suffix='_safe')
+    
+    try:
+        # Close the file descriptor immediately
+        os.close(fd)
+        # Copy the contents of the input file to the temporary file.
+        file.save(temp_path)
+
+        # Step 1: Get DCT image from Malex service.
+        img_bigramdct = request_image("getDCTImage", temp_path)
+        if not isinstance(img_bigramdct, np.ndarray) or img_bigramdct.shape != (256, 256):
+            print("Error: Invalid DCT image format")
+            return
+
+        # Step 2: Process with YOLO model.
+        yolo_result = model_YOLO(img_bigramdct)[0]
+        yolo_probs = yolo_result.probs.data.cpu().numpy().tolist()
+
+        # Step 3: Extract PE sections.
+        section_extractor = PESectionExtractor()
+        sections = section_extractor.extract_sections(temp_path)
+        # Step 4: Tokenize sections.
+        # Assume tokenizer returns a list like: [tokenized_section_list]
+        tokenized_sections = json_tokenizer.tokenize_sections(sections)
+        # Convert tokenized_sections to tensor without adding an extra batch dimension.
+        tokenized_sections_tensor = tokenized_sections[0].unsqueeze(0)
+        print("tokenized_sections_tensor",tokenized_sections_tensor.shape)
+        # Step 5: Run the combined model.
+        with torch.no_grad():
+            # For the image, add a batch dimension (since models typically expect batch)
+            img_tensor = torch.tensor(img_bigramdct).unsqueeze(0).to(device)
+            print("img_tensor",img_tensor.shape)
+            combined_pred = malwareDetector(tokenized_sections_tensor, img_tensor)
+            combined_prob = combined_pred.item()
+        
+        # Create the response
+        response = {
+            'prediction': 'malicious' if combined_prob >= 0.4 else 'benign',
+            'confidence': 1-float(combined_prob),
+            'malicious_probability': float(combined_prob),
+            'benign_probability': 1-float(combined_prob)
+        }
+        return jsonify(response)
+        
+    except Exception as e:
+        print(f"Processing error: {str(e)}")
+        return jsonify({"error": f"Processing error: {str(e)}"}), 500
+        
+    finally:
+        # Always clean up the temporary file, even if errors occur
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
 
 @app.route('/quick_scan', methods=['POST'])
 def quick_scan():
@@ -412,6 +602,7 @@ def quick_scan():
             file.save(temp_path)
             # Get DCT image from Malex service
             img_bigramdct = request_image("getDCTImage", temp_path)
+            print(img_bigramdct.shape)
             if 'error' in img_bigramdct:
                 return jsonify({"error": img_bigramdct['error']}), 502
         
@@ -506,4 +697,6 @@ def pdf_scan():
         return jsonify({"message": "File processed successfully", "features": features})
     
 if __name__ == '__main__':
+    load_models()
+    # run_deep_scan_on_file("./ques1.exe")
     app.run(port=5000, debug=True)  # Disable debug in production
