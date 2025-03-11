@@ -422,10 +422,10 @@ def quick_scan():
             p = result.probs.data.cpu().numpy().tolist()
             
             return jsonify({
-                "status": "success",
-                "malware_probability": p[1],
-                "benign_probability": p[0],
-                "confidence": max(p)
+                'prediction': 'malicious' if float(p[1]) >=0.5 else 'benign',
+                'confidence': float(max(p)),
+                'malicious_probability': float(p[1]),
+                'benign_probability': float(p[0])
             })
             
     except Exception as e:

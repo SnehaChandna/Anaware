@@ -20,9 +20,9 @@ const app = new Hono<{
     GOOGLE_CLIENT_SECRET: string;
     GOOGLE_REDIRECT_URI: string;
     VIRUSTOTAL_API_KEY: string;
+    FLASK_ENDPOINT:string;
   };
 }>();
-const FLASK_ENDPOINT="https://8ff1-2409-40d6-100b-6bca-c0cf-c8e2-d352-8e25.ngrok-free.app"
 
 
 app.use("/*", cors({

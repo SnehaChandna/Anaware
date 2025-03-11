@@ -12,7 +12,8 @@
     "GOOGLE_CLIENT_ID":"18236046335-dm4f3um637tnvu7p352dg89743ipctim.apps.googleusercontent.com",
     "GOOGLE_CLIENT_SECRET":"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",
     "GOOGLE_REDIRECT_URI":"https://my-app.b22023.workers.dev/auth/google/callback",
-    "VIRUSTOTAL_API_KEY":"31d3ff2faf7e0fee36de1584bddad11fd66c8c5ddedf4352d9c9908fd8b24a9f"
+    "VIRUSTOTAL_API_KEY":"31d3ff2faf7e0fee36de1584bddad11fd66c8c5ddedf4352d9c9908fd8b24a9f",
+    "FLASK_ENDPOINT": "https://fc2f-2409-40d6-32-bb9f-d4aa-373d-3c13-c332.ngrok-free.app"
     }
   // "kv_namespaces": [
   //   {
