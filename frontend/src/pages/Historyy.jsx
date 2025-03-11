@@ -35,6 +35,7 @@ export const Historyy = () => {
             setLoading(false);
         } catch (error) {
             console.error("Error fetching history:", error);
+            console.log(error)
             setError("Failed to load your scan history");
             setLoading(false);
         }
