@@ -207,11 +207,15 @@ app.post('/api/scan-file', async (c) => {
   const fileExtension = file.name.split('.').pop()?.toLowerCase() || '';
   const ALLOWED_EXTENSIONS_FILES = new Set(['exe', 'dll', 'bin']);
   const ALLOWED_EXTENSIONS_IMAGE = new Set(['png', 'jpg', 'jpeg']);
+  const ALLOWED_EXTENSIONS_PDF = new Set(['pdf']);
+  
   let flaskEndpoint: string;
   if (ALLOWED_EXTENSIONS_FILES.has(fileExtension)) {
     flaskEndpoint = 'quick_scan';
   } else if (ALLOWED_EXTENSIONS_IMAGE.has(fileExtension)) {
     flaskEndpoint = 'Image';
+  } else if (ALLOWED_EXTENSIONS_PDF.has(fileExtension)) {
+    flaskEndpoint = 'pdf_scan';
   } else {
     return c.json({ error: 'Unsupported file type' }, 400);
   }
@@ -221,10 +225,9 @@ app.post('/api/scan-file', async (c) => {
     const fileContent = await file.arrayBuffer();
     const blob = new Blob([fileContent], { type: file.type });
     flaskFormData.append('file', blob, file.name);
-
     // Forward to Flask server
     const flaskResponse = await fetch(
-      `${FLASK_ENDPOINT}/${flaskEndpoint}`,
+      `${c.env.FLASK_ENDPOINT}/${flaskEndpoint}`,
       {
         method: 'POST',
         body: flaskFormData
@@ -234,14 +237,14 @@ app.post('/api/scan-file', async (c) => {
       const errorText = await flaskResponse.text();
       throw new Error(`Flask server error: ${flaskResponse.status} - ${errorText}`);
     }
-    
+   
     // Get result
     const result = await flaskResponse.json();
-    
+   
     // Get auth token from request header
     const authHeader = c.req.header('Authorization');
     const token = authHeader?.replace('Bearer ', '');
-    
+   
     // If the user is authenticated, save scan to history
     if (token) {
       try {
@@ -250,10 +253,10 @@ app.post('/api/scan-file', async (c) => {
           const prisma = new PrismaClient({
             datasourceUrl: c.env.DATABASE_URL,
           }).$extends(withAccelerate());
-          
+         
           // Determine if file is malicious based on prediction
           const isMalicious = result.prediction === 'malicious' ? 1 : 0;
-          
+         
           try {
             // Create a new history record
             await prisma.history.create({
@@ -273,16 +276,14 @@ app.post('/api/scan-file', async (c) => {
         // Continue even if history saving fails
       }
     }
-
     return c.json(result);
-
   } catch (error) {
     console.error('Error processing file:', error);
     return c.json(
-      { 
+      {
         error: 'Failed to process file',
         details: error instanceof Error ? error.message : 'Unknown error'
-      }, 
+      },
       500
     );
   }
