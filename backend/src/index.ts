@@ -211,7 +211,7 @@ app.post('/api/scan-file', async (c) => {
   
   let flaskEndpoint: string;
   if (ALLOWED_EXTENSIONS_FILES.has(fileExtension)) {
-    flaskEndpoint = 'quick_scan';
+    flaskEndpoint = 'deep_scan';
   } else if (ALLOWED_EXTENSIONS_IMAGE.has(fileExtension)) {
     flaskEndpoint = 'Image';
   } else if (ALLOWED_EXTENSIONS_PDF.has(fileExtension)) {
